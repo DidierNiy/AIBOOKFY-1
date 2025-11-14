@@ -1,0 +1,5 @@
+{
+  "name": "AIBookify",
+  "description": "An AI-powered hotel booking platform where travelers interact with a conversational AI to find and book hotels, and hotels manage their properties through a smart AI dashboard.",
+  "requestFramePermissions": []
+}
