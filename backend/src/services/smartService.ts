@@ -160,8 +160,8 @@ Return ONLY valid JSON:
 }`;
 
   try {
-    // ensure we await the async factory so `model` is the instance (not a Promise)
-    const model = await getGeminiModel();
+    // ensure we await the async factory with generate mode so `model.generateContent` is supported
+    const model = await getGeminiModel({ mode: 'generate' });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = await response.text();
@@ -434,8 +434,8 @@ Respond now (plain text only, conversational):`;
 
 
   try {
-    // ensure we await the async factory so `model` is the instance (not a Promise)
-    const model = await getGeminiModel();
+    // ensure we await the async factory with generate mode
+    const model = await getGeminiModel({ mode: 'generate' });
     const result = await model.generateContent(expertPrompt);
     const response = await result.response;
     const text = await response.text();

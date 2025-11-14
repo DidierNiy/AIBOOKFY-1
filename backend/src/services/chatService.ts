@@ -25,7 +25,7 @@ class ChatService {
 
   private async initModel() {
     try {
-      this.model = await getGeminiModel();
+      this.model = await getGeminiModel({ mode: 'chat' });
     } catch (err) {
       console.error('Failed to initialize Gemini model:', err);
       this.model = null;
@@ -70,7 +70,7 @@ class ChatService {
       // ensure model is initialized (retry init if necessary)
       if (!this.model) {
         try {
-          this.model = await getGeminiModel();
+          this.model = await getGeminiModel({ mode: 'chat' });
         } catch (e) {
           console.error('Could not load AI model before generating response:', e);
           throw new Error('AI model unavailable');
