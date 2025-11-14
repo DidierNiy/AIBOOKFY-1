@@ -1,11 +1,13 @@
-import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import ChatHistory, { IMessage } from '../models/chatHistory';
 import Listing from '../models/Listing';
 import { getSmartResponse } from './smartService';
 
 dotenv.config();
+
+// Initialize Google's Generative AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // Message structure for saving into DB
 interface MessageData {
@@ -16,12 +18,11 @@ interface MessageData {
 }
 
 class ChatService {
-  private openai: OpenAI;
+  private model: any;
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    // Initialize the model
+    this.model = genAI.getGenerativeModel({ model: 'gemini-pro' });
   }
 
   // Smart chat without a specific hotel
@@ -67,26 +68,45 @@ class ChatService {
         isAI: false,
       });
 
-      // Fetch last 5 messages for context
+      // Fetch chat history for context
       const chatHistory = await this.getChatHistory(hotelContext.id, userId);
-      const recentMessages = chatHistory.messages.slice(-5);
+      
+      // Prepare conversation history for Gemini
+      const chat = this.model.startChat({
+        history: [
+          {
+            role: 'user',
+            parts: [{ text: `You are a helpful assistant for the hotel with ID: ${hotelContext.id}. Provide helpful and accurate information.` }]
+          },
+          {
+            role: 'model',
+            parts: [{ text: 'I understand. I\'m here to help with any questions about this hotel.' }]
+          },
+          ...(chatHistory.messages || []).slice(-5).flatMap(msg => [
+            {
+              role: msg.isAI ? 'model' : 'user',
+              parts: [{ text: msg.content }]
+            }
+          ])
+        ],
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature: 0.7,
+        },
+      });
 
-      // System prompt for context
-      const systemPrompt = `You are an AI hotel assistant for ${hotelContext?.name || 'this hotel'}.
-Location: ${hotelContext?.location || 'N/A'}
-Price Range: ${hotelContext?.priceRange || 'N/A'}
-Amenities: ${Array.isArray(hotelContext?.amenities) ? hotelContext.amenities.join(', ') : (hotelContext?.amenities || 'N/A')}
-Available Rooms: ${hotelContext?.availableRooms ?? 'N/A'}`;
+      // Get AI response
+      const result = await chat.sendMessage(userMessage);
+      const response = await result.response;
+      const aiResponse = response.text() || 'I am not sure how to respond to that.';
 
-      // Typed messages for OpenAI
-      const messages: ChatCompletionMessageParam[] = [
-        { role: "system" as const, content: systemPrompt },
-        ...recentMessages.map(msg => ({
-          role: msg.isAI ? "assistant" as const : "user" as const,
-          content: msg.content
-        })),
-        { role: "user" as const, content: userMessage }
-      ];
+      // Save AI response
+      await this.saveMessage({
+        hotelId: hotelContext.id,
+        userId,
+        content: aiResponse,
+        isAI: true,
+      });
 
       // Optional: search database if user wants hotels
       let hotelsFound: any[] | undefined;
@@ -103,45 +123,24 @@ Available Rooms: ${hotelContext?.availableRooms ?? 'N/A'}`;
               { description: regex }
             ]
           }).limit(6).lean();
+
+          if (hotelsFound && hotelsFound.length > 0) {
+            const placeholderImage = 'https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop';
+            const hotels = hotelsFound.map(h => ({
+              id: h._id,
+              name: h.name,
+              location: h.location,
+              price: h.price,
+              description: h.description,
+              images: Array.isArray(h.images) && h.images.length > 0 ? h.images : [placeholderImage],
+              rating: h.rating || 4.0,
+              amenities: h.amenities || []
+            }));
+            return { text: aiResponse, hotels };
+          }
         }
       } catch (err) {
         console.error('Listing search error:', err);
-      }
-
-      // Call OpenAI
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4",
-        messages,
-        temperature: 0.3,
-        max_tokens: 150,
-        presence_penalty: 0.1,
-        frequency_penalty: 0.1
-      });
-
-      const aiResponse = completion.choices[0].message?.content ?? "I apologize, but I couldn't generate a response.";
-
-      // Save AI response
-      await this.saveMessage({
-        hotelId: hotelContext.id,
-        userId,
-        content: aiResponse,
-        isAI: true,
-      });
-
-      // Return hotels if found
-      if (hotelsFound && hotelsFound.length > 0) {
-        const placeholderImage = 'https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop';
-        const hotels = hotelsFound.map(h => ({
-          id: h._id,
-          name: h.name,
-          location: h.location,
-          price: h.price,
-          description: h.description,
-          images: Array.isArray(h.images) && h.images.length > 0 ? h.images : [placeholderImage],
-          rating: h.rating || 4.0,
-          amenities: h.amenities || []
-        }));
-        return { text: aiResponse, hotels };
       }
 
       return { text: aiResponse };

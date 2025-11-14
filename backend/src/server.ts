@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { createServer } from "http";
+import path from 'path';
 import connectDB from "./config/database"; 
 import userRoutes from "./routes/userRoutes";
 import listingRoutes from "./routes/listingRoutes";
@@ -9,8 +10,15 @@ import paymentRoutes from "./routes/paymentRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import SocketService from "./services/socketService";
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from src/.env
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+// Verify environment variables are loaded
+console.log('Environment variables loaded:', {
+  NODE_ENV: process.env.NODE_ENV,
+  MONGO_URI: process.env.MONGO_URI ? '***' : 'Not found',
+  PORT: process.env.PORT
+});
 
 // Initialize Express app
 const app = express();

@@ -1,6 +1,11 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 
+interface MpesaAuthResponse {
+  access_token: string;
+  expires_in: string;
+}
+
 dotenv.config();
 
 const MPESA_CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY;
@@ -18,7 +23,7 @@ export class MpesaService {
     const auth = Buffer.from(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`).toString('base64');
     
     try {
-      const response = await axios.get(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
+      const response = await axios.get<MpesaAuthResponse>(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
         headers: {
           Authorization: `Basic ${auth}`,
         },
