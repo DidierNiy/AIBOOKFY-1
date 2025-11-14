@@ -1,4 +1,3 @@
-
 import { getGeminiModel } from './aiService';
 import Listing, { IListing } from '../models/Listing';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -161,6 +160,8 @@ Return ONLY valid JSON:
 }`;
 
   try {
+    // ensure we await the async factory so `model` is the instance (not a Promise)
+    const model = await getGeminiModel();
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = await response.text();
@@ -433,6 +434,8 @@ Respond now (plain text only, conversational):`;
 
 
   try {
+    // ensure we await the async factory so `model` is the instance (not a Promise)
+    const model = await getGeminiModel();
     const result = await model.generateContent(expertPrompt);
     const response = await result.response;
     const text = await response.text();

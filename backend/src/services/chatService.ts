@@ -1,13 +1,10 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiModel } from './aiService';
 import dotenv from 'dotenv';
 import ChatHistory, { IMessage } from '../models/chatHistory';
 import Listing from '../models/Listing';
 import { getSmartResponse } from './smartService';
 
 dotenv.config();
-
-// Initialize Google's Generative AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // Message structure for saving into DB
 interface MessageData {
@@ -21,8 +18,18 @@ class ChatService {
   private model: any;
 
   constructor() {
-    // Initialize the model
-    this.model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    // Initialize the model asynchronously. If it fails, generateResponse will retry.
+    this.model = null;
+    this.initModel();
+  }
+
+  private async initModel() {
+    try {
+      this.model = await getGeminiModel();
+    } catch (err) {
+      console.error('Failed to initialize Gemini model:', err);
+      this.model = null;
+    }
   }
 
   // Smart chat without a specific hotel
@@ -60,6 +67,15 @@ class ChatService {
   // AI chat with hotel context
   async generateResponse(userMessage: string, hotelContext: any, userId: string): Promise<{ text: string; hotels?: any[] }> {
     try {
+      // ensure model is initialized (retry init if necessary)
+      if (!this.model) {
+        try {
+          this.model = await getGeminiModel();
+        } catch (e) {
+          console.error('Could not load AI model before generating response:', e);
+          throw new Error('AI model unavailable');
+        }
+      }
       // Save user message first
       await this.saveMessage({
         hotelId: hotelContext.id,
