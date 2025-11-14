@@ -81,7 +81,7 @@ export class ContextService {
     if (!context) return;
 
     try {
-      const model = getGeminiModel();
+      const model = await getGeminiModel();
       const prompt = `Analyze this new user message and update structured preference & state memory.
 MESSAGE: "${query}"
 CURRENT_MEMORY: ${JSON.stringify({ preferences: context.preferences, lastEmotion: context.lastEmotion, lastIntent: context.lastIntent, lastPurpose: context.lastPurpose })}

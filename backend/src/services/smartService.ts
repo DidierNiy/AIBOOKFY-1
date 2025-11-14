@@ -298,10 +298,10 @@ async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
 
     // 1) Prioritize exact/strong name match if hotelName provided
     if (hotelName && hotelName.trim()) {
-      const exactName = new RegExp(`^${hotelName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      const exactName = new RegExp(`^${hotelName.trim().replace(/[.*+?^${}()|[\\\]\\]/g, '\\$&')}$`, 'i');
       listings = (await Listing.find({ name: exactName }).limit(3)) as IListing[];
       if (listings.length === 0) {
-        const containsName = new RegExp(hotelName.trim().replace(/[.*+?^${}()|[\]\\]/g, ''), 'i');
+        const containsName = new RegExp(hotelName.trim().replace(/[.*+?^${}()|[\\\]\\]/g, ''), 'i');
         listings = (await Listing.find({ name: containsName }).limit(5)) as IListing[];
       }
     }
@@ -333,7 +333,7 @@ async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
 
     const preferredAmenities: string[] = Array.isArray(amenities) ? amenities.map(a => String(a).toLowerCase()) : [];
 
-    const nameRegex = hotelName ? new RegExp(hotelName.trim().replace(/[.*+?^${}()|[\]\\]/g, ''), 'i') : null;
+    const nameRegex = hotelName ? new RegExp(hotelName.trim().replace(/[.*+?^${}()|[\\\]\\]/g, ''), 'i') : null;
 
     const scored = listings.map(l => {
       const a = (l.amenities || []).map(x => String(x).toLowerCase());
