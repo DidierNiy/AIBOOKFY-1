@@ -1,7 +1,7 @@
 import { getGeminiModel } from './aiService';
-import Listing, { IListing } from '../models/Listing';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ContextService } from './contextService';
+import { findHotels as findHotelsFromGeoapify } from './geoapifyService';
 
 // Utility: robustly extract a JSON object string from a model response
 function extractJsonString(input: string): string | null {
@@ -265,102 +265,45 @@ Return ONLY valid JSON:
   }
 }
 
-// 4. Function to search the database for hotels with flexible matching
+// 4. Function to search for hotels - REPLACED WITH GEOAPIFY
 async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
-  const { location, amenities, hotelName } = analysis.entities;
-  const query: any = {};
-  const orConditions: any[] = [];
+  const { location } = analysis.entities;
 
-  console.log('Searching hotels with:', { location, amenities });
-
-  // Build flexible search query
-  if (location && location.trim()) {
-    const locationRegex = new RegExp(location.trim(), 'i');
-    orConditions.push(
-      { location: locationRegex },
-      { name: locationRegex },
-      { description: locationRegex }
-    );
+  if (!location || !location.trim()) {
+    console.log('No location provided, skipping API search.');
+    return [];
   }
-
-  if (amenities && amenities.length > 0) {
-    query.amenities = { $in: amenities }; // Use $in instead of $all for more flexible matching
-  }
-
-  // If we have location search conditions, use $or
-  if (orConditions.length > 0) {
-    query.$or = orConditions;
-  }
+  
+  console.log(`🚀 Calling Geoapify to find hotels in: "${location}"`);
 
   try {
-    // Cast the result to IListing[] for proper typing
-    let listings: IListing[] = [] as any;
+    const hotelsFromApi = await findHotelsFromGeoapify(location);
+    console.log(`✅ Geoapify found ${hotelsFromApi.length} potential hotels.`);
 
-    // 1) Prioritize exact/strong name match if hotelName provided
-    if (hotelName && hotelName.trim()) {
-      const exactName = new RegExp(`^${hotelName.trim().replace(/[.*+?^${}()|[\\\]\\]/g, '\\$&')}$`, 'i');
-      listings = (await Listing.find({ name: exactName }).limit(3)) as IListing[];
-      if (listings.length === 0) {
-        const containsName = new RegExp(hotelName.trim().replace(/[.*+?^${}()|[\\\]\\]/g, ''), 'i');
-        listings = (await Listing.find({ name: containsName }).limit(5)) as IListing[];
-      }
-    }
-
-    // 2) If still nothing, do flexible search by location/amenities
-    if (listings.length === 0) {
-      listings = (await Listing.find(query).limit(20)) as IListing[];
+    if (hotelsFromApi.length === 0) {
+      return [];
     }
     
-    // If no results found with strict query, try broader search
-    if (listings.length === 0 && location) {
-      console.log('No results found, trying broader search...');
-      listings = (await Listing.find({}).limit(6)) as IListing[];
-    }
-
-    console.log(`Found ${listings.length} hotels`);
-
+    // Map the API results to our HotelData structure.
+    // We'll use placeholder data for fields not in the initial search result.
     const placeholderImage = 'https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop';
     
-    // Adaptive ranking based on amenities/budget/name match and rating
-    const budget = String((analysis.entities as any).budget || '').toLowerCase();
-    const budgetScore = (price: number) => {
-      if (!price || isNaN(price)) return 0;
-      if (budget === 'budget') return price <= 100 ? 3 : price <= 150 ? 1 : 0;
-      if (budget === 'mid-range' || budget === 'midrange') return price >= 80 && price <= 250 ? 3 : price <= 300 ? 1 : 0;
-      if (budget === 'luxury') return price >= 250 ? 3 : price >= 200 ? 1 : 0;
-      return 0;
-    };
-
-    const preferredAmenities: string[] = Array.isArray(amenities) ? amenities.map(a => String(a).toLowerCase()) : [];
-
-    const nameRegex = hotelName ? new RegExp(hotelName.trim().replace(/[.*+?^${}()|[\\\]\\]/g, ''), 'i') : null;
-
-    const scored = listings.map(l => {
-      const a = (l.amenities || []).map(x => String(x).toLowerCase());
-      const amenityHits = preferredAmenities.filter(p => a.includes(p)).length;
-      const nameHit = nameRegex && nameRegex.test(l.name || '') ? 5 : 0;
-      const priceHit = budgetScore(l.price || 0);
-      const ratingHit = Math.min(l.rating || 0, 5) * 0.5; // scale rating to weight
-      const score = amenityHits * 2 + nameHit + priceHit + ratingHit;
-      return { l, score };
-    }).sort((x, y) => y.score - x.score);
-
-    const ranked = scored.map(({ l }) => l);
-
-    return ranked.map((listing: IListing): HotelData => ({
-      id: listing._id.toString(),
-      name: listing.name || 'Hotel',
-      description: listing.description || '',
-      location: listing.location || '',
-      price: listing.price || 0,
-      amenities: listing.amenities || [],
-      images: (Array.isArray(listing.images) && listing.images.length > 0)
-        ? listing.images
-        : [placeholderImage],
-      rating: listing.rating || 4.0,
+    const hotelData: HotelData[] = hotelsFromApi.map(hotel => ({
+      id: hotel.id,
+      name: hotel.name || 'Hotel Name',
+      location: hotel.location || 'Location not available',
+      description: 'Select this hotel to see more details.', // Placeholder description
+      price: 0, // Placeholder price
+      amenities: [], // Placeholder amenities
+      images: [placeholderImage],
+      rating: 0, // Placeholder rating
     }));
+
+    return hotelData;
+
   } catch (error) {
-    console.error('Error searching for hotels:', error);
+    console.error('❌ Error calling Geoapify service from smartService:', error);
+    // Return empty array if the API call fails
     return [];
   }
 }
@@ -383,11 +326,8 @@ async function generateResponse(
     ? hotels.map((h, idx) => 
         `${idx + 1}. **${h.name}**
    📍 Location: ${h.location}
-   💰 Price: $${h.price}/night
-   ⭐ Rating: ${h.rating}/5.0
-   ✨ Amenities: ${h.amenities.slice(0, 5).join(', ')}
-   📝 ${h.description.substring(0, 100)}...`
-      ).join('\n\n')
+`
+      ).join('\n')
     : 'No exact matches found in our current database.';
 
   // Lightweight dynamic memory distillation
@@ -410,21 +350,20 @@ ${contextInfo?.userPreferences || '(getting to know user)'}
 
 CURRENT MESSAGE: "${query}"
 
-CONVERSATION TYPE: ${hotels.length > 0 ? 'HOTEL SEARCH' : 'CASUAL/INFO'}
+SEARCH RESULTS:
+I have found ${hotels.length} hotels based on the user's query.
+${hotelDetails}
 
 YOUR BEHAVIOR:
 1. **Natural Greeting Response**: If user says "hi/hello/hey", greet warmly and ask how you can help with their travel plans today.
 2. **Build Rapport**: For casual questions or small talk, respond naturally like ChatGPT - be helpful, friendly, conversational.
-3. **Gradual Discovery**: Don't force hotel search. Let conversation flow. Ask follow-ups naturally.
-4. **Hotel Search Mode**: ONLY when you have ${hotels.length} hotel results to share, present them enthusiastically with reasons they're great matches.
-5. **Adaptive Tone**: Match user's energy - casual with casual, professional with business, excited with excited.
+3. **Hotel Search Mode**: When you have hotel results to share, present them. Let the user know you found options and list the names and locations.
+4. **Adaptive Tone**: Match user's energy - casual with casual, professional with business, excited with excited.
 
 STYLE:
 - Short, conversational sentences (like texting a knowledgeable friend)
 - Use "I" naturally: "I can help you find...", "I'd recommend...", "I'm here to..."
 - Avoid robotic phrases like "Certainly!" or "I would be happy to assist"
-- Be human: acknowledge uncertainty, show personality, use light humor when appropriate
-- ${hotels.length > 0 ? 'Highlight top 2 hotels with specific compelling reasons' : 'Focus on understanding what they need before searching'}
 
 ${(contextInfo?.clarifyingQuestions && contextInfo.clarifyingQuestions.length > 0 && hotels.length === 0)
   ? `If they haven't given enough to search yet, casually ask: ${contextInfo.clarifyingQuestions[0]}`
@@ -441,51 +380,13 @@ Respond now (plain text only, conversational):`;
     const text = await response.text();
     
     console.log('🎨 AI Expert Response Generated:', text.substring(0, 150));
-    console.log('📊 Response context:', { hotelsCount: hotels.length, queryLength: query.length });
     
-    const cleaned = text.trim();
+    return { text: text.trim(), hotels };
     
-    // If no hotels and it's a greeting/casual, return friendly response
-    if (hotels.length === 0 && cleaned.length > 10) {
-      console.log('✅ Returning conversational response (no hotels)');
-      return { text: cleaned, hotels: [] };
-    }
-    
-    // If we have hotels, return them with the response
-    if (hotels.length > 0) {
-      console.log('✅ Returning response WITH hotels:', hotels.length);
-      return { text: cleaned, hotels };
-    }
-    
-    // Provide better default if model response too short
-    let fallbackText: string;
-    if (hotels.length > 0) {
-      fallbackText = `I found ${hotels.length} great option${hotels.length===1?'':'s'} for you! Let me highlight the best matches based on what you're looking for.`;
-    } else if (/^(hi|hello|hey|yo|hola)\b/i.test(query.trim()) || contextInfo?.lastIntent === 'greeting') {
-      fallbackText = `Hey there! 👋 Great to meet you. I'm your travel buddy. What kind of trip are you thinking about — relaxing escape, city adventure, business, something romantic?`;  
-    } else if (contextInfo?.lastIntent === 'small_talk') {
-      fallbackText = `I'm here and ready to help with travel whenever you are. Got a destination in mind or just exploring ideas?`;
-    } else {
-      fallbackText = `Tell me your destination (city or area) and any preferences (budget, vibe, must-have amenities) and I'll start finding options.`;
-    }
-    return { 
-      text: cleaned && cleaned.length > 20 ? cleaned : fallbackText,
-      hotels 
-    };
   } catch (error) {
     console.error('Error generating AI response:', error);
-    // Intelligent fallback with greeting awareness
-    let text: string;
-    if (hotels.length > 0) {
-      text = `I've got ${hotels.length} solid option${hotels.length===1?'':'s'} here. Want me to walk you through the top picks?`;
-    } else if (/^(hi|hello|hey|yo|hola)\b/i.test(query.trim()) || contextInfo?.lastIntent === 'greeting') {
-      text = `Hey! 👋 I'm your travel buddy. Whenever you're ready, tell me a destination or the kind of stay you want and I'll tailor options. What are you planning?`;
-    } else if (contextInfo?.lastIntent === 'small_talk') {
-      text = `Happy to chat! And when you feel like searching, just drop a place or style (beach, city, quiet, luxury, budget).`;
-    } else {
-      text = `Share a destination (city/area) plus any vibes or amenities you care about, and I'll start building a shortlist for you.`;
-    }
-    return { text, hotels };
+    let fallbackText = `I found ${hotels.length} great option${hotels.length===1?'':'s'} for you! Here are the top results.`;
+    return { text: fallbackText, hotels };
   }
 }
 
@@ -497,77 +398,49 @@ export async function getSmartResponse(
   try {
     console.log('Processing query for user:', userId, '- Query:', query);
     
-    // Save user message to conversation history
     ContextService.saveUserMessage(userId, query);
-    
-    // Update user preferences based on query
     await ContextService.updatePreferences(userId, query);
     
-    // Get conversation history for context
-  const conversationHistory = ContextService.getConversationHistory(userId);
-  const userPreferences = ContextService.getUserPreferences(userId);
+    const conversationHistory = ContextService.getConversationHistory(userId);
+    const userPreferences = ContextService.getUserPreferences(userId);
     
-    console.log('Conversation context:', { 
-      hasHistory: !!conversationHistory, 
-      hasPreferences: !!userPreferences 
-    });
-    
-    // Analyze query with enhanced context
     const analysis = await analyzeQuery(query);
     console.log('Query analysis:', analysis);
 
-    // Only search hotels if shouldShowHotels is true
     let hotels: HotelData[] = [];
-    if (analysis.shouldShowHotels && analysis.intent === 'search_hotels') {
+    if (analysis.shouldShowHotels && analysis.entities.location) {
       console.log('🔍 Triggering hotel search with analysis:', {
         intent: analysis.intent,
-        shouldShowHotels: analysis.shouldShowHotels,
         location: analysis.entities.location
       });
       hotels = await searchHotels(analysis);
-      console.log(`✅ Found ${hotels.length} hotels`);
     } else {
-      console.log('💬 Conversational mode - no hotel search triggered', {
-        intent: analysis.intent,
-        shouldShowHotels: analysis.shouldShowHotels
-      });
+      console.log('💬 Conversational mode - no hotel search triggered');
     }
 
-    // Retrieve prior emotion/intent state for adaptive tone
     const state = ContextService.getState(userId);
 
-    // Generate clarifying questions only if in search mode but missing key info
     const clarifyingQuestions: string[] = [];
-    if (analysis.intent === 'search_hotels' || analysis.conversationType === 'search') {
-      const hasLocation = !!analysis.entities.location && analysis.entities.location.trim().length > 0;
-      const hasBudget = !!analysis.entities.budget;
-      const hasPurpose = !!(analysis.entities.travelPurpose || state.lastPurpose);
-      if (!hasLocation) clarifyingQuestions.push('Which city or area are you thinking about?');
-      if (!hasBudget) clarifyingQuestions.push('What\'s your budget per night roughly?');
-      if (!hasPurpose && hotels.length === 0) clarifyingQuestions.push('Is this for business, vacation, or something special?');
-      // Limit to top 2 to avoid overload
+    if (analysis.intent === 'search_hotels' && !analysis.entities.location) {
+      clarifyingQuestions.push('Which city or area are you thinking about?');
     }
-    const trimmedClarifiers = clarifyingQuestions.slice(0, 2);
-
-    // Generate contextual response (pass current intent for accurate greeting handling)
+    
     const response = await generateResponse(query, hotels, {
       conversationHistory,
       userPreferences,
       lastEmotion: state.lastEmotion,
       lastIntent: analysis.intent,
-      clarifyingQuestions: trimmedClarifiers,
+      clarifyingQuestions,
     });
     
-    // Save AI response to conversation history
     ContextService.saveAIMessage(userId, response.text);
     
     return response;
     
   } catch (error) {
     console.error('Error in getSmartResponse:', error);
-    // Graceful fallback
     return {
-      text: "I'm your dedicated travel expert, and I'm here to create the perfect stay for you! ✈️ Tell me about your dream destination, and I'll find accommodations that exceed your expectations. What location are you interested in?",
+      text: "I'm having a little trouble right now, but I'm still here to help! Could you tell me the destination you're interested in again?",
       hotels: []
     };
   }
