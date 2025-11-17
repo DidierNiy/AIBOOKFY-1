@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Message } from "../types";
+import { Message, ChatSession, LoadedChatSession } from "../types";
 import { getAiResponse } from "../services/geminiService";
 import ChatInput from "../components/chat/ChatInput";
 import ChatMessage from "../components/chat/ChatMessage";
@@ -8,7 +8,12 @@ import { INITIAL_GREETING } from "../constants";
 import TravelerSidebar from "../components/traveler/Sidebar";
 import HotelCard from "../components/chat/HotelCard";
 
-import { getSmartChatResponse } from "../services/smartChatService";
+import {
+  getSmartChatResponse,
+  getChatSessions,
+  loadChatSession,
+  deleteChatSession,
+} from "../services/smartChatService";
 import { useAuth } from "../contexts/AuthContext";
 
 const TravelerUIPage: React.FC = () => {
@@ -17,9 +22,27 @@ const TravelerUIPage: React.FC = () => {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(
+    undefined
+  );
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Load chat sessions on component mount
+  useEffect(() => {
+    loadChatSessions();
+  }, [user?.token]);
+
+  const loadChatSessions = async () => {
+    try {
+      const sessions = await getChatSessions(user?.token);
+      setChatSessions(sessions);
+    } catch (error) {
+      console.error("Failed to load chat sessions:", error);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,14 +54,48 @@ const TravelerUIPage: React.FC = () => {
 
   const handleNewChat = () => {
     setMessages([{ id: "0", sender: "ai", text: INITIAL_GREETING }]);
+    setCurrentSessionId(undefined);
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
-  const handleSendMessage = async (text: string) => {
+  const handleLoadSession = async (sessionId: string) => {
+    try {
+      const session = await loadChatSession(sessionId, user?.token);
+      if (session) {
+        setMessages(session.messages);
+        setCurrentSessionId(sessionId);
+        if (window.innerWidth < 768) setIsSidebarOpen(false);
+      }
+    } catch (error) {
+      console.error("Failed to load chat session:", error);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      const deleted = await deleteChatSession(sessionId, user?.token);
+      if (deleted) {
+        // If we deleted the current session, start a new chat
+        if (currentSessionId === sessionId) {
+          handleNewChat();
+        }
+        // Refresh the sessions list
+        loadChatSessions();
+      }
+    } catch (error) {
+      console.error("Failed to delete chat session:", error);
+    }
+  };
+
+  const handleSendMessage = async (
+    text: string,
+    isVoiceMessage: boolean = false
+  ) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       sender: "user",
       text,
+      isVoiceMessage,
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
@@ -51,7 +108,18 @@ const TravelerUIPage: React.FC = () => {
     setMessages((prev) => [...prev, loadingMessage]);
 
     try {
-      const aiMessage = await getSmartChatResponse(text, user?.token);
+      const aiMessage = await getSmartChatResponse(
+        text,
+        user?.token,
+        currentSessionId
+      );
+
+      // Update current session ID if this is a new session
+      if (!currentSessionId && aiMessage.sessionId) {
+        setCurrentSessionId(aiMessage.sessionId);
+        // Refresh chat sessions list
+        loadChatSessions();
+      }
 
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== "loading"),
@@ -77,6 +145,10 @@ const TravelerUIPage: React.FC = () => {
     <div className="flex h-full w-full relative">
       <TravelerSidebar
         onNewChat={handleNewChat}
+        onLoadSession={handleLoadSession}
+        onDeleteSession={handleDeleteSession}
+        chatSessions={chatSessions}
+        currentSessionId={currentSessionId}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
       />

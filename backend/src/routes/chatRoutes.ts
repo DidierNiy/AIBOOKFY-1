@@ -101,14 +101,64 @@ router.post('/interactions', authenticateUser, async (req: AuthRequest, res) => 
   }
 });
 
+// Get chat sessions for user
+router.get('/sessions', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id || req.query.userId as string || 'guest-user';
+    
+    const sessions = await chatService.getChatSessions(userId);
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching chat sessions:', error);
+    res.status(500).json({ message: 'Failed to fetch chat sessions' });
+  }
+});
+
+// Load specific chat session
+router.get('/sessions/:sessionId', async (req: AuthRequest, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user?.id || req.query.userId as string || 'guest-user';
+    
+    const session = await chatService.loadChatSession(sessionId, userId);
+    if (!session) {
+      return res.status(404).json({ message: 'Chat session not found' });
+    }
+    
+    res.json(session);
+  } catch (error) {
+    console.error('Error loading chat session:', error);
+    res.status(500).json({ message: 'Failed to load chat session' });
+  }
+});
+
+// Delete specific chat session
+router.delete('/sessions/:sessionId', async (req: AuthRequest, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user?.id || req.query.userId as string || 'guest-user';
+    
+    const deleted = await chatService.deleteChatSession(sessionId, userId);
+    if (!deleted) {
+      return res.status(404).json({ message: 'Chat session not found' });
+    }
+    
+    res.json({ message: 'Chat session deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting chat session:', error);
+    res.status(500).json({ message: 'Failed to delete chat session' });
+  }
+});
+
 // New route for smart chat using Gemini (NO AUTH REQUIRED for demo)
 router.post('/smart-chat', async (req: AuthRequest, res) => {
-  const { message } = req.body;
+  const { message, sessionId } = req.body;
   const userId = req.user?.id || 'guest-user';
 
   console.log('=== SMART CHAT REQUEST ===');
   console.log('User ID:', userId);
   console.log('Message:', message);
+  console.log('Session ID:', sessionId);
 
   if (!message) {
     console.log('❌ No message - returning 400');
@@ -118,31 +168,34 @@ router.post('/smart-chat', async (req: AuthRequest, res) => {
   try {
     console.log(`✅ Processing smart-chat request for user ${userId}: "${message}"`);
     
-    const result = await getSmartResponse(message, userId);
-    console.log('✅ getSmartResponse returned:', { 
+    const result = await chatService.getSmartChatResponse(message, userId, sessionId);
+    console.log('✅ getSmartChatResponse returned:', { 
       hasText: !!result.text, 
       textLength: result.text?.length || 0,
-      hotelsCount: result.hotels?.length || 0 
+      hotelsCount: result.hotels?.length || 0,
+      sessionId: result.sessionId
     });
     
-    const { text, hotels } = result;
+    const { text, hotels, sessionId: newSessionId } = result;
     
     if (!text) {
       console.log('❌ No text in response');
       throw new Error('No response generated');
     }
     
-    console.log(`✅ Sending response: ${text.substring(0, 50)}..., hotels: ${hotels.length}`);
+    console.log(`✅ Sending response: ${text.substring(0, 50)}..., hotels: ${hotels?.length || 0}`);
     
-    // Return consistent format: { response: string, hotels: array }
+    // Return consistent format with session ID
     const responseData = { 
       response: text, 
-      hotels: hotels || [] 
+      hotels: hotels || [],
+      sessionId: newSessionId
     };
     
     console.log('✅ Final response object:', { 
       hasResponse: !!responseData.response,
-      hotelsCount: responseData.hotels.length 
+      hotelsCount: responseData.hotels.length,
+      sessionId: responseData.sessionId
     });
     
     return res.json(responseData);

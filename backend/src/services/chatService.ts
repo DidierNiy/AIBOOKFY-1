@@ -33,13 +33,21 @@ class ChatService {
   }
 
   // Smart chat without a specific hotel
-  async getSmartChatResponse(userMessage: string, userId: string): Promise<{ text: string; hotels?: any[] }> {
+  async getSmartChatResponse(userMessage: string, userId: string, sessionId?: string): Promise<{ text: string; hotels?: any[]; sessionId: string }> {
     try {
-      const genericHotelId = 'smart-chat';
+      let currentSessionId: string;
+      
+      // If no session ID provided, create a new session
+      if (!sessionId) {
+        const newSession = await this.createChatSession(userId, userMessage);
+        currentSessionId = newSession._id.toString();
+      } else {
+        currentSessionId = sessionId;
+      }
 
       // Save user message
       await this.saveMessage({
-        hotelId: genericHotelId,
+        hotelId: currentSessionId,
         userId,
         content: userMessage,
         isAI: false,
@@ -50,14 +58,17 @@ class ChatService {
 
       // Save AI response
       await this.saveMessage({
-        hotelId: genericHotelId,
+        hotelId: currentSessionId,
         userId,
         content: aiResponse.text, // Ensure content is always a string
         isAI: true,
       });
 
+      // Update session with latest message
+      await this.updateSessionLastMessage(currentSessionId, aiResponse.text);
+
       // Return response for frontend
-      return { text: aiResponse.text, hotels: aiResponse.hotels };
+      return { text: aiResponse.text, hotels: aiResponse.hotels, sessionId: currentSessionId };
     } catch (error) {
       console.error('Error in getSmartChatResponse:', error);
       throw new Error('Failed to get smart chat response');
@@ -209,6 +220,109 @@ class ChatService {
     } catch (error) {
       console.error('Error fetching hotel chat histories:', error);
       throw new Error('Failed to fetch hotel chat histories');
+    }
+  }
+
+  // Create a new chat session
+  async createChatSession(userId: string, firstMessage: string): Promise<any> {
+    try {
+      const sessionTitle = this.generateSessionTitle(firstMessage);
+      const sessionId = new Date().getTime().toString();
+      
+      const chatHistory = new ChatHistory({
+        hotelId: sessionId, // Using sessionId as hotelId for smart chat sessions
+        userId,
+        messages: [],
+        sessionTitle,
+        lastMessage: '',
+      });
+      
+      return await chatHistory.save();
+    } catch (error) {
+      console.error('Error creating chat session:', error);
+      throw new Error('Failed to create chat session');
+    }
+  }
+
+  // Get all chat sessions for a user
+  async getChatSessions(userId: string) {
+    try {
+      const sessions = await ChatHistory.find(
+        { userId },
+        { _id: 1, sessionTitle: 1, lastMessage: 1, updatedAt: 1, messages: 1 }
+      ).sort('-updatedAt').limit(20);
+
+      return sessions.map(session => ({
+        id: session._id,
+        title: session.sessionTitle || 'New Chat',
+        lastMessage: session.lastMessage || 'No messages yet',
+        updatedAt: session.updatedAt,
+        messageCount: session.messages.length
+      }));
+    } catch (error) {
+      console.error('Error fetching chat sessions:', error);
+      throw new Error('Failed to fetch chat sessions');
+    }
+  }
+
+  // Load a specific chat session
+  async loadChatSession(sessionId: string, userId: string) {
+    try {
+      const session = await ChatHistory.findOne({ 
+        _id: sessionId, 
+        userId 
+      });
+      
+      if (!session) {
+        return null;
+      }
+
+      return {
+        id: session._id,
+        title: session.sessionTitle,
+        messages: session.messages.map(msg => ({
+          id: msg.timestamp.getTime().toString(),
+          sender: msg.isAI ? 'ai' : 'user',
+          text: msg.content,
+          timestamp: msg.timestamp,
+        })),
+        updatedAt: session.updatedAt,
+      };
+    } catch (error) {
+      console.error('Error loading chat session:', error);
+      throw new Error('Failed to load chat session');
+    }
+  }
+
+  // Update session's last message
+  async updateSessionLastMessage(sessionId: string, lastMessage: string) {
+    try {
+      await ChatHistory.findByIdAndUpdate(sessionId, {
+        lastMessage: lastMessage.substring(0, 100) // Limit to 100 chars
+      });
+    } catch (error) {
+      console.error('Error updating session last message:', error);
+    }
+  }
+
+  // Generate session title from first message
+  private generateSessionTitle(message: string): string {
+    // Simple title generation - take first few words
+    const words = message.split(' ').slice(0, 4).join(' ');
+    return words.length > 30 ? words.substring(0, 30) + '...' : words;
+  }
+
+  // Delete a chat session
+  async deleteChatSession(sessionId: string, userId: string): Promise<boolean> {
+    try {
+      const result = await ChatHistory.findOneAndDelete({ 
+        _id: sessionId, 
+        userId 
+      });
+      return result !== null;
+    } catch (error) {
+      console.error('Error deleting chat session:', error);
+      throw new Error('Failed to delete chat session');
     }
   }
 }

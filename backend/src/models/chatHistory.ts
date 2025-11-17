@@ -11,6 +11,8 @@ export interface IChatHistory extends Document {
   hotelId: string;
   userId: string;
   messages: IMessage[];
+  sessionTitle?: string;
+  lastMessage?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,6 +44,14 @@ const chatHistorySchema = new Schema({
       default: false,
     }
   }],
+  sessionTitle: {
+    type: String,
+    default: '',
+  },
+  lastMessage: {
+    type: String,
+    default: '',
+  },
 }, {
   timestamps: true,
 });

@@ -30,6 +30,8 @@ export interface Message {
   text?: string;
   hotels?: Hotel[];
   isLoading?: boolean;
+  sessionId?: string;
+  isVoiceMessage?: boolean;
   paymentDetails?: {
       bookingId: string;
       amount: number;
@@ -37,6 +39,27 @@ export interface Message {
   },
   navigateTo?: string;
   bookingReceipt?: BookingReceiptData; // Add this line
+}
+
+export interface SpeechRecognitionResult {
+  transcript: string;
+  confidence: number;
+  isFinal: boolean;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  lastMessage: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface LoadedChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  updatedAt: string;
 }
 
 export interface Booking {
