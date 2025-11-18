@@ -89,10 +89,16 @@ export async function getGeminiModel(opts?: { mode?: 'chat' | 'generate' }): Pro
           return {
             sendMessage: async (message: string) => {
               // use generateContent and return an object shaped like the SDK expected result
-              const res = await (genAI as any).generateContent({
+              const res: any = await (genAI as any).generateContent({
                 model: name,
                 prompt: { text: message }
               }).catch((e: any) => ({ error: e }));
+              
+              // Skip processing if there's an error
+              if (res?.error) {
+                throw res.error;
+              }
+              
               // Try to normalize response.text() usage from ChatService
               const textFromRes =
                 // SDK may return output items

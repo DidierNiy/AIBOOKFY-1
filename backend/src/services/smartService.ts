@@ -288,16 +288,25 @@ async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
     // We'll use placeholder data for fields not in the initial search result.
     const placeholderImage = 'https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop';
     
-    const hotelData: HotelData[] = hotelsFromApi.map(hotel => ({
-      id: hotel.id,
-      name: hotel.name || 'Hotel Name',
-      location: hotel.location || 'Location not available',
-      description: 'Select this hotel to see more details.', // Placeholder description
-      price: 0, // Placeholder price
-      amenities: [], // Placeholder amenities
-      images: [placeholderImage],
-      rating: 0, // Placeholder rating
-    }));
+    const hotelData: HotelData[] = hotelsFromApi.map(hotel => {
+      // Use images from Geoapify if available, otherwise use placeholder
+      const images = (hotel.images && Array.isArray(hotel.images) && hotel.images.length > 0)
+        ? hotel.images
+        : [placeholderImage];
+      
+      console.log(`🖼️ Hotel ${hotel.name} images:`, images);
+      
+      return {
+        id: hotel.id,
+        name: hotel.name || 'Hotel Name',
+        location: hotel.location || 'Location not available',
+        description: 'Select this hotel to see more details.', // Placeholder description
+        price: 0, // Placeholder price
+        amenities: [], // Placeholder amenities
+        images: images,
+        rating: 0, // Placeholder rating
+      };
+    });
 
     return hotelData;
 

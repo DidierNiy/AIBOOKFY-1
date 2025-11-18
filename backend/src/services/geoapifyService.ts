@@ -15,6 +15,12 @@ interface GeoapifyPlaceDetails {
         address_line2: string;
         categories: string[];
         details: any[]; 
+        image?: string;
+        image_url?: string;
+        photo?: string;
+        photo_url?: string;
+        images?: string[];
+        photos?: string[];
         datasource: {
             raw: {
                 'internet_access'?: string;
@@ -25,8 +31,16 @@ interface GeoapifyPlaceDetails {
                 'operator'?: string;
                 'phone'?: string;
                 'website'?: string;
+                'image'?: string;
+                'image_url'?: string;
+                'photo'?: string;
+                'photo_url'?: string;
+                'images'?: string[];
+                'photos'?: string[];
+                [key: string]: any;
             }
         }
+        [key: string]: any; // Allow for other properties
     }
 }
 
@@ -37,6 +51,7 @@ interface HotelInfo {
     amenities: string[];
     phone?: string;
     website?: string;
+    images?: string[];
 }
 
 interface GeoapifyPlace {
@@ -44,6 +59,13 @@ interface GeoapifyPlace {
         place_id: string;
         name: string;
         address_line2: string;
+        image?: string;
+        image_url?: string;
+        photo?: string;
+        photo_url?: string;
+        images?: string[];
+        photos?: string[];
+        [key: string]: any; // Allow for other properties
     }
 }
 
@@ -73,11 +95,39 @@ export const findHotels = async (location: string): Promise<any[]> => {
 
         const placesResponse = await axios.get<GeoapifyPlacesResponse>(`https://api.geoapify.com/v2/places?categories=accommodation.hotel&filter=circle:${lon},${lat},5000&bias=proximity:${lon},${lat}&apiKey=${apiKey}`);
 
-        return placesResponse.data.features.map((feature: GeoapifyPlace) => ({
-            id: feature.properties.place_id,
-            name: feature.properties.name,
-            location: feature.properties.address_line2
-        }));
+        // Log the first feature to inspect available fields
+        if (placesResponse.data.features.length > 0) {
+            console.log('🔍 Geoapify API Response Sample (first hotel):', JSON.stringify(placesResponse.data.features[0], null, 2));
+        }
+
+        return placesResponse.data.features.map((feature: GeoapifyPlace) => {
+            const props = feature.properties;
+            
+            // Extract images from various possible fields
+            let images: string[] = [];
+            if (props.images && Array.isArray(props.images)) {
+                images = props.images;
+            } else if (props.photos && Array.isArray(props.photos)) {
+                images = props.photos;
+            } else if (props.image_url) {
+                images = [props.image_url];
+            } else if (props.photo_url) {
+                images = [props.photo_url];
+            } else if (props.image) {
+                images = [props.image];
+            } else if (props.photo) {
+                images = [props.photo];
+            }
+
+            console.log(`📸 Images found for ${props.name}:`, images.length > 0 ? images : 'None');
+
+            return {
+                id: props.place_id,
+                name: props.name,
+                location: props.address_line2,
+                images: images.length > 0 ? images : undefined
+            };
+        });
 
     } catch (error) {
         console.error('Error finding hotels from Geoapify:', error);
@@ -97,7 +147,40 @@ export const getHotelDetails = async (placeId: string): Promise<HotelInfo | null
             return null;
         }
         
-        const rawData = placeDetails.datasource.raw;
+        // Log the full response to inspect available fields
+        console.log('🔍 Geoapify Place Details Response:', JSON.stringify(placeDetails, null, 2));
+        
+        const rawData = placeDetails.datasource?.raw || {};
+
+        // Extract images from various possible fields
+        let images: string[] = [];
+        if (placeDetails.images && Array.isArray(placeDetails.images)) {
+            images = placeDetails.images;
+        } else if (placeDetails.photos && Array.isArray(placeDetails.photos)) {
+            images = placeDetails.photos;
+        } else if (placeDetails.image_url) {
+            images = [placeDetails.image_url];
+        } else if (placeDetails.photo_url) {
+            images = [placeDetails.photo_url];
+        } else if (placeDetails.image) {
+            images = [placeDetails.image];
+        } else if (placeDetails.photo) {
+            images = [placeDetails.photo];
+        } else if (rawData.images && Array.isArray(rawData.images)) {
+            images = rawData.images;
+        } else if (rawData.photos && Array.isArray(rawData.photos)) {
+            images = rawData.photos;
+        } else if (rawData.image_url) {
+            images = [rawData.image_url];
+        } else if (rawData.photo_url) {
+            images = [rawData.photo_url];
+        } else if (rawData.image) {
+            images = [rawData.image];
+        } else if (rawData.photo) {
+            images = [rawData.photo];
+        }
+
+        console.log(`📸 Images found for ${placeDetails.name}:`, images.length > 0 ? images : 'None');
 
         const hotelInfo: HotelInfo = {
             name: placeDetails.name,
@@ -105,7 +188,8 @@ export const getHotelDetails = async (placeId: string): Promise<HotelInfo | null
             rating: rawData.stars ? parseInt(rawData.stars, 10) : undefined,
             amenities: [],
             phone: rawData.phone,
-            website: rawData.website
+            website: rawData.website,
+            images: images.length > 0 ? images : undefined
         };
 
         if(rawData.internet_access && rawData.internet_access !== 'no') {
