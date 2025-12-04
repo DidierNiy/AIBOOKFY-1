@@ -22,6 +22,10 @@ const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
     return null;
   }
 
+  // Debug logging
+  console.log(`🏨 HotelCard rendering for: ${hotel.name}`);
+  console.log('Hotel images received:', hotel.images);
+
   // Ensure images is always a valid array with at least a placeholder
   const placeholderImage = "https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop";
 
@@ -34,7 +38,10 @@ const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
     if (validImages.length > 0) {
       images = validImages;
     }
+    console.log('Valid images after filtering:', validImages);
   }
+
+  console.log(`Final images array for ${hotel.name}:`, images);
 
   // Ensure currentImage is within bounds
   const safeImageIndex = Math.max(0, Math.min(currentImage, images.length - 1));
@@ -56,10 +63,15 @@ const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
           src={images[safeImageIndex] || placeholderImage}
           alt={hotel.name || 'Hotel'}
           className="w-full h-48 object-cover"
+          onLoad={(e) => {
+            console.log(`✅ Image loaded successfully for ${hotel.name}:`, (e.target as HTMLImageElement).src);
+          }}
           onError={(e) => {
+            console.error(`❌ Image failed to load for ${hotel.name}:`, (e.target as HTMLImageElement).src);
             // Fallback to placeholder if image fails to load
             const target = e.target as HTMLImageElement;
             if (target.src !== placeholderImage) {
+              console.log(`🔄 Switching to placeholder for ${hotel.name}`);
               target.src = placeholderImage;
             }
           }}
