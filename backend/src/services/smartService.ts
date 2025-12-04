@@ -286,8 +286,8 @@ async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
     
     // Map the API results to our HotelData structure.
     // We'll use placeholder data for fields not in the initial search result.
-    // Using placeholder.com which is designed for placeholders and doesn't block hotlinking
-    const placeholderImage = 'https://via.placeholder.com/1200x800/4A5568/FFFFFF?text=Hotel+Image';
+    // Using a data URI (SVG) to avoid CSP and network blocking issues
+    const placeholderImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'%3E%3Crect width='1200' height='800' fill='%234A5568'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial, sans-serif' font-size='48' fill='%23FFFFFF' text-anchor='middle' dominant-baseline='middle'%3EHotel Image%3C/text%3E%3C/svg%3E";
     
     const hotelData: HotelData[] = hotelsFromApi.map(hotel => {
       // Use images from Geoapify if available, otherwise use placeholder
