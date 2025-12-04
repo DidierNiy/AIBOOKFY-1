@@ -107,8 +107,8 @@ export async function searchHotelImages(
     }
 
     return [];
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
+  } catch (error: any) {
+    if (error.response) {
       console.error('Pexels API error:', error.response?.status, error.response?.data);
     } else {
       console.error('Error fetching images from Pexels:', error);
@@ -145,7 +145,7 @@ export async function getCuratedHotelImages(count: number = 3): Promise<string[]
     }
 
     return [];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching curated images from Pexels:', error);
     return [];
   }
