@@ -2,6 +2,7 @@ import { getGeminiModel } from './aiService';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ContextService } from './contextService';
 import { findHotels as findHotelsFromGeoapify } from './geoapifyService';
+import { searchHotelImages } from './pexelsService';
 
 // Utility: robustly extract a JSON object string from a model response
 function extractJsonString(input: string): string | null {
@@ -288,20 +289,34 @@ async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
     // We'll use placeholder data for fields not in the initial search result.
     // Using a data URI (SVG) to avoid CSP and network blocking issues
     const placeholderImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'%3E%3Crect width='1200' height='800' fill='%234A5568'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial, sans-serif' font-size='48' fill='%23FFFFFF' text-anchor='middle' dominant-baseline='middle'%3EHotel Image%3C/text%3E%3C/svg%3E";
-    
-    const hotelData: HotelData[] = hotelsFromApi.map(hotel => {
-      // Use images from Geoapify if available, otherwise use placeholder
+
+    // Fetch images from Pexels for each hotel (in parallel for better performance)
+    const hotelDataPromises = hotelsFromApi.map(async (hotel) => {
       let images: string[] = [placeholderImage]; // Default to placeholder
 
+      // First, try to use images from Geoapify
       if (hotel.images && Array.isArray(hotel.images) && hotel.images.length > 0) {
-        // Filter out any invalid/empty URLs
         const validImages = hotel.images.filter((img: string) => img && typeof img === 'string' && img.trim().length > 0);
         if (validImages.length > 0) {
           images = validImages;
+          console.log(`✅ Using ${validImages.length} Geoapify images for ${hotel.name}`);
         }
       }
 
-      console.log(`🖼️ Hotel ${hotel.name} images:`, images);
+      // If no Geoapify images, try fetching from Pexels
+      if (images.length === 1 && images[0] === placeholderImage) {
+        try {
+          const pexelsImages = await searchHotelImages(hotel.name, hotel.location);
+          if (pexelsImages && pexelsImages.length > 0) {
+            images = pexelsImages;
+            console.log(`🎨 Using ${pexelsImages.length} Pexels images for ${hotel.name}`);
+          } else {
+            console.log(`⚠️  No Pexels images found for ${hotel.name}, using placeholder`);
+          }
+        } catch (error) {
+          console.error(`❌ Error fetching Pexels images for ${hotel.name}:`, error);
+        }
+      }
 
       return {
         id: hotel.id,
@@ -314,6 +329,9 @@ async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
         rating: 0, // Placeholder rating
       };
     });
+
+    // Wait for all hotel data to be populated (including Pexels images)
+    const hotelData = await Promise.all(hotelDataPromises);
 
     return hotelData;
 
