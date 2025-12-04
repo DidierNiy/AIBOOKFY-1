@@ -10,15 +10,19 @@ interface HotelCardProps {
 const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
   const [currentImage, setCurrentImage] = useState(0);
   const navigate = useNavigate();
-  
+
   // Safely get chat context - use useContext directly to avoid throwing
   const chatContext = useContext(ChatContext);
   const joinHotelRoom = chatContext?.joinHotelRoom;
   const sendMessage = chatContext?.sendMessage;
 
+  // DEBUG: Component is loading
+  console.log('🔥 HotelCard component is rendering!');
+  console.log('Hotel prop:', hotel);
+
   // Validate hotel data
   if (!hotel || !hotel.id || !hotel.name) {
-    console.error('Invalid hotel data:', hotel);
+    console.error('❌ Invalid hotel data:', hotel);
     return null;
   }
 

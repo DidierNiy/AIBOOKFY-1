@@ -23,18 +23,30 @@ export const getSmartChatResponse = async (message: string, authToken?: string, 
     });
 
     const data = await response.json();
-    
+
+    console.log('📡 API Response received:', data);
+    console.log('📡 Hotels in response:', data.hotels);
+    if (data.hotels && data.hotels.length > 0) {
+      console.log('📡 First hotel:', data.hotels[0]);
+      console.log('📡 First hotel images:', data.hotels[0].images);
+    }
+
     if (!response.ok) {
       throw new Error(data.message || 'Failed to get smart chat response');
     }
 
-    return {
+    const messageWithHotels = {
       id: Date.now().toString(),
-      sender: 'ai',
+      sender: 'ai' as const,
       text: data.response || "I apologize, but I'm having trouble understanding. Could you please rephrase your question?",
       hotels: data.hotels || [],
       sessionId: data.sessionId,
     };
+
+    console.log('📡 Message object created:', messageWithHotels);
+    console.log('📡 Message hotels:', messageWithHotels.hotels);
+
+    return messageWithHotels;
   } catch (error) {
     console.error('Error in getSmartChatResponse:', error);
     throw error;
