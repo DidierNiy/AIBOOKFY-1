@@ -183,14 +183,6 @@ const TravelerUIPage: React.FC = () => {
             {messages.map((msg) => {
               const hasHotels = Array.isArray(msg.hotels) && msg.hotels.length > 0;
 
-              console.log('💬 Message in TravelerUIPage:', msg);
-              console.log('💬 Has hotels:', hasHotels);
-              if (hasHotels) {
-                console.log('💬 Hotels array:', msg.hotels);
-                console.log('💬 First hotel:', msg.hotels[0]);
-                console.log('💬 First hotel images:', msg.hotels[0]?.images);
-              }
-
               return (
                 <React.Fragment key={msg.id}>
                   <ChatMessage message={msg} />
@@ -202,7 +194,6 @@ const TravelerUIPage: React.FC = () => {
                           console.warn('Invalid hotel data at index', index, hotel);
                           return null;
                         }
-                        console.log(`💬 Rendering HotelCard for: ${hotel.name}, images:`, hotel.images);
                         return (
                           <HotelCard key={hotel.id || `hotel-${index}`} hotel={hotel} />
                         );
