@@ -31,7 +31,7 @@ const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
   console.log('Hotel images received:', hotel.images);
 
   // Ensure images is always a valid array with at least a placeholder
-  const placeholderImage = "https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop";
+  const placeholderImage = "https://via.placeholder.com/1200x800/4A5568/FFFFFF?text=Hotel+Image";
 
   let images: string[] = [placeholderImage];
   if (Array.isArray(hotel.images) && hotel.images.length > 0) {

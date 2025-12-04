@@ -152,7 +152,7 @@ class ChatService {
           }).limit(6).lean();
 
           if (hotelsFound && hotelsFound.length > 0) {
-            const placeholderImage = 'https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop';
+            const placeholderImage = 'https://via.placeholder.com/1200x800/4A5568/FFFFFF?text=Hotel+Image';
             const hotels = hotelsFound.map(h => {
               // Ensure images is always a valid array with at least the placeholder
               let images = [placeholderImage];
