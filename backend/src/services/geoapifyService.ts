@@ -125,7 +125,7 @@ export const findHotels = async (location: string): Promise<any[]> => {
                 id: props.place_id,
                 name: props.name,
                 location: props.address_line2,
-                images: images.length > 0 ? images : undefined
+                images: images.length > 0 ? images : []
             };
         });
 
@@ -189,7 +189,7 @@ export const getHotelDetails = async (placeId: string): Promise<HotelInfo | null
             amenities: [],
             phone: rawData.phone,
             website: rawData.website,
-            images: images.length > 0 ? images : undefined
+            images: images.length > 0 ? images : []
         };
 
         if(rawData.internet_access && rawData.internet_access !== 'no') {

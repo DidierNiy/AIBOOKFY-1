@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Hotel } from "../../types";
-import { useChat } from "../../contexts/ChatContext";
+import { ChatContext } from "../../contexts/ChatContext";
 
 interface HotelCardProps {
   hotel: Hotel;
@@ -10,14 +10,34 @@ interface HotelCardProps {
 const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
   const [currentImage, setCurrentImage] = useState(0);
   const navigate = useNavigate();
-  const { joinHotelRoom, sendMessage } = useChat();
+  
+  // Safely get chat context - use useContext directly to avoid throwing
+  const chatContext = useContext(ChatContext);
+  const joinHotelRoom = chatContext?.joinHotelRoom;
+  const sendMessage = chatContext?.sendMessage;
 
-  const images =
-    Array.isArray(hotel.images) && hotel.images.length > 0
-      ? hotel.images
-      : [
-          "https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop",
-        ];
+  // Validate hotel data
+  if (!hotel || !hotel.id || !hotel.name) {
+    console.error('Invalid hotel data:', hotel);
+    return null;
+  }
+
+  // Ensure images is always a valid array with at least a placeholder
+  const placeholderImage = "https://images.unsplash.com/photo-1559599238-0ea6229ab6a6?q=80&w=1200&auto=format&fit=crop";
+
+  let images: string[] = [placeholderImage];
+  if (Array.isArray(hotel.images) && hotel.images.length > 0) {
+    // Filter out any invalid URLs
+    const validImages = hotel.images.filter(
+      (img) => img && typeof img === 'string' && img.trim().length > 0
+    );
+    if (validImages.length > 0) {
+      images = validImages;
+    }
+  }
+
+  // Ensure currentImage is within bounds
+  const safeImageIndex = Math.max(0, Math.min(currentImage, images.length - 1));
 
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -33,9 +53,16 @@ const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
     <div className="bg-light-card dark:bg-dark-card rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700 w-full max-w-sm mx-auto">
       <div className="relative">
         <img
-          src={images[currentImage]}
-          alt={hotel.name}
+          src={images[safeImageIndex] || placeholderImage}
+          alt={hotel.name || 'Hotel'}
           className="w-full h-48 object-cover"
+          onError={(e) => {
+            // Fallback to placeholder if image fails to load
+            const target = e.target as HTMLImageElement;
+            if (target.src !== placeholderImage) {
+              target.src = placeholderImage;
+            }
+          }}
         />
         {images.length > 1 && (
           <>
@@ -79,29 +106,33 @@ const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
         )}
       </div>
       <div className="p-4">
-        <h3 className="font-bold text-lg">{hotel.name}</h3>
+        <h3 className="font-bold text-lg">{hotel.name || 'Hotel'}</h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          {hotel.location}
+          {hotel.location || 'Location not available'}
         </p>
-        <div className="flex items-center my-2">
-          <span className="text-yellow-500">
-            {"★".repeat(Math.round(hotel.rating))}
-            {"☆".repeat(5 - Math.round(hotel.rating))}
-          </span>
-          <span className="text-xs ml-2 text-gray-500">
-            {hotel.rating} stars
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2 my-3">
-          {hotel.amenities.slice(0, 3).map((amenity) => (
-            <span
-              key={amenity}
-              className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full"
-            >
-              {amenity}
+        {hotel.rating !== undefined && hotel.rating > 0 && (
+          <div className="flex items-center my-2">
+            <span className="text-yellow-500">
+              {"★".repeat(Math.min(Math.round(hotel.rating), 5))}
+              {"☆".repeat(Math.max(5 - Math.round(hotel.rating), 0))}
             </span>
-          ))}
-        </div>
+            <span className="text-xs ml-2 text-gray-500">
+              {hotel.rating.toFixed(1)} stars
+            </span>
+          </div>
+        )}
+        {hotel.amenities && Array.isArray(hotel.amenities) && hotel.amenities.length > 0 && (
+          <div className="flex flex-wrap gap-2 my-3">
+            {hotel.amenities.slice(0, 3).map((amenity, index) => (
+              <span
+                key={amenity || index}
+                className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full"
+              >
+                {amenity}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex justify-between items-center mt-4">
           <p className="text-xl font-bold">
             ${hotel.price}
@@ -143,8 +174,12 @@ const HotelCard: React.FC<HotelCardProps> = ({ hotel }) => {
               }
               // Join hotel room and send initial booking intent so hotel sees it in real time
               try {
-                joinHotelRoom(hotel.id);
-                sendMessage(`I'd like to book ${hotel.name}.`, hotel.id, false);
+                if (joinHotelRoom) {
+                  joinHotelRoom(hotel.id);
+                }
+                if (sendMessage) {
+                  sendMessage(`I'd like to book ${hotel.name}.`, hotel.id, false);
+                }
               } catch (e) {
                 console.warn("Socket not available yet, continuing navigation");
               }

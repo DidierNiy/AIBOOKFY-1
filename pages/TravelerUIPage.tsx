@@ -180,18 +180,29 @@ const TravelerUIPage: React.FC = () => {
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="mx-auto max-w-3xl space-y-6">
-            {messages.map((msg) => (
-              <React.Fragment key={msg.id}>
-                <ChatMessage message={msg} />
-                {msg.hotels && msg.hotels.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {msg.hotels.map((hotel) => (
-                      <HotelCard key={hotel.id} hotel={hotel} />
-                    ))}
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
+            {messages.map((msg) => {
+              const hasHotels = Array.isArray(msg.hotels) && msg.hotels.length > 0;
+              
+              return (
+                <React.Fragment key={msg.id}>
+                  <ChatMessage message={msg} />
+                  {hasHotels && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                      {msg.hotels.map((hotel, index) => {
+                        // Validate hotel before rendering
+                        if (!hotel || !hotel.id) {
+                          console.warn('Invalid hotel data at index', index, hotel);
+                          return null;
+                        }
+                        return (
+                          <HotelCard key={hotel.id || `hotel-${index}`} hotel={hotel} />
+                        );
+                      })}
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
         </main>

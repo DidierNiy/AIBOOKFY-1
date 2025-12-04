@@ -13,7 +13,7 @@ interface ChatContextType {
   joinHotelRoom: (hotelId: string) => void;
 }
 
-const ChatContext = createContext<ChatContextType | undefined>(undefined);
+export const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [socket, setSocket] = useState<Socket | null>(null);

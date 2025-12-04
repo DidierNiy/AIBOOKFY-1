@@ -290,12 +290,18 @@ async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
     
     const hotelData: HotelData[] = hotelsFromApi.map(hotel => {
       // Use images from Geoapify if available, otherwise use placeholder
-      const images = (hotel.images && Array.isArray(hotel.images) && hotel.images.length > 0)
-        ? hotel.images
-        : [placeholderImage];
-      
+      let images: string[] = [placeholderImage]; // Default to placeholder
+
+      if (hotel.images && Array.isArray(hotel.images) && hotel.images.length > 0) {
+        // Filter out any invalid/empty URLs
+        const validImages = hotel.images.filter((img: string) => img && typeof img === 'string' && img.trim().length > 0);
+        if (validImages.length > 0) {
+          images = validImages;
+        }
+      }
+
       console.log(`🖼️ Hotel ${hotel.name} images:`, images);
-      
+
       return {
         id: hotel.id,
         name: hotel.name || 'Hotel Name',
