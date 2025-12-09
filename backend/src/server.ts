@@ -8,6 +8,7 @@ import userRoutes from "./routes/userRoutes";
 import listingRoutes from "./routes/listingRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import chatRoutes from "./routes/chatRoutes";
+import dashboardRoutes from "./routes/dashboardRoutes";
 import SocketService from "./services/socketService";
 
 // Load environment variables from src/.env
@@ -50,6 +51,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/listings", listingRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 // Global error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error details:', {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Sidebar, { NavItem } from "../components/dashboard/Sidebar";
 import Overview from "../components/dashboard/sections/Overview";
@@ -11,13 +11,37 @@ import Settings from "../components/dashboard/sections/Settings";
 import Restaurant from "../components/dashboard/sections/Restaurant";
 import { Listing } from "../types";
 import { MOCK_LISTINGS } from "../constants";
+import { dashboardService } from "../services/dashboardService";
 
 const HotelDashboardPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<NavItem>("Overview");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to closed on mobile
   const [listings, setListings] = useState<Listing[]>(MOCK_LISTINGS);
+  const [isLoadingListings, setIsLoadingListings] = useState(false);
 
-  const handleSaveListing = (
+  useEffect(() => {
+    fetchListings();
+  }, []);
+
+  const fetchListings = async () => {
+    try {
+      setIsLoadingListings(true);
+      const data = await dashboardService.getListings();
+      if (data && data.length > 0) {
+        setListings(data);
+      } else {
+        // Fallback to mock data
+        setListings(MOCK_LISTINGS);
+      }
+    } catch (error) {
+      console.error('Error fetching listings:', error);
+      setListings(MOCK_LISTINGS);
+    } finally {
+      setIsLoadingListings(false);
+    }
+  };
+
+  const handleSaveListing = async (
     listingData: Omit<Listing, "id" | "isActive" | "photos"> & {
       photos: (File | string)[];
     },
@@ -55,11 +79,16 @@ const HotelDashboardPage: React.FC = () => {
       };
       setListings((prev) => [newListing, ...prev]);
     }
+
+    // Refresh listings from backend (in production, this would save to backend first)
+    setTimeout(() => fetchListings(), 500);
   };
 
   const handleDeleteListing = (listingId: string) => {
     if (window.confirm("Are you sure you want to delete this listing?")) {
       setListings(listings.filter((l) => l.id !== listingId));
+      // Refresh from backend (in production, this would delete from backend first)
+      setTimeout(() => fetchListings(), 500);
     }
   };
 
