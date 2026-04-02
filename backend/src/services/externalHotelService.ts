@@ -74,7 +74,7 @@ class ExternalHotelService {
   // Search hotels from multiple sources and merge results
   async searchHotels(filters: SearchFilters): Promise<ExternalHotelData[]> {
     console.log('🌍 Searching global hotels with filters:', filters);
-    
+
     try {
       // Search from multiple APIs in parallel
       const [bookingResults, rapidApiResults, amadeusResults] = await Promise.allSettled([
@@ -183,12 +183,13 @@ class ExternalHotelService {
 
     try {
       // First get access token
-      const tokenResponse = await axios.post('https://test.api.amadeus.com/v1/security/oauth2/token', 
+      const tokenResponse = await axios.post('https://test.api.amadeus.com/v1/security/oauth2/token',
         'grant_type=client_credentials&client_id=' + this.apis.amadeus.apiKey + '&client_secret=' + this.apis.amadeus.secret,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
 
-      const accessToken = tokenResponse.data.access_token;
+      const accessToken = (tokenResponse.data as { access_token: string }).access_token;
+
 
       const response = await axios.get(`${this.apis.amadeus.baseUrl}/searchHotel`, {
         params: {
@@ -232,7 +233,7 @@ class ExternalHotelService {
       const location = locations[i % locations.length];
       const chain = hotelChains[i % hotelChains.length];
       const basePrice = Math.floor(Math.random() * 300) + 80;
-      
+
       return {
         id: `ext_hotel_${i + 1}`,
         name: `${chain} ${location.city} ${['Downtown', 'Airport', 'Luxury', 'Business', 'Resort'][i % 5]}`,
@@ -302,29 +303,29 @@ class ExternalHotelService {
       // Calculate composite score
       let scoreA = this.calculateHotelScore(a, filters);
       let scoreB = this.calculateHotelScore(b, filters);
-      
+
       return scoreB - scoreA; // Descending order
     });
   }
 
   private calculateHotelScore(hotel: ExternalHotelData, filters: SearchFilters): number {
     let score = 0;
-    
+
     // Rating weight (40%)
     score += (hotel.rating / 5) * 40;
-    
+
     // Price attractiveness (30%)
-    const priceScore = filters.maxPrice 
+    const priceScore = filters.maxPrice
       ? Math.max(0, (filters.maxPrice - hotel.price) / filters.maxPrice * 30)
       : 30;
     score += priceScore;
-    
+
     // Commission rate for our business (20%)
     score += hotel.commissionRate * 100 * 20;
-    
+
     // Review count credibility (10%)
     score += Math.min(hotel.reviewCount / 1000, 1) * 10;
-    
+
     return score;
   }
 
