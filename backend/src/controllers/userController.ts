@@ -206,6 +206,40 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
+// One-time seed endpoint to create a verified test hotel user
+// Requires SEED_SECRET env var to be set; disabled if not set
+export const seedTestUser = async (req: Request, res: Response) => {
+  const secret = process.env.SEED_SECRET;
+  if (!secret) {
+    return res.status(404).json({ message: "Not found" });
+  }
+  if (req.body.secret !== secret) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const TEST_EMAIL = "hotel@aibookify.com";
+  const TEST_PASSWORD = "Hotel@1234";
+
+  try {
+    const hashed = await bcrypt.hash(TEST_PASSWORD, 10);
+    const user = await User.findOneAndUpdate(
+      { email: TEST_EMAIL },
+      {
+        email: TEST_EMAIL,
+        password: hashed,
+        role: "hotelManager",
+        isVerified: true,
+        paymentStatus: "confirmed",
+        plan: "pro",
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json({ message: "Test user ready", email: user.email, role: user.role });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
 // Resend verification code
 export const resendVerification = async (req: Request, res: Response) => {
   const { email } = req.body;

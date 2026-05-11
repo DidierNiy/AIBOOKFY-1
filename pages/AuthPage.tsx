@@ -52,7 +52,7 @@ const AuthPage: React.FC = () => {
       if (isSignUp) {
         // Call register
         const response = await fetch(
-          "http://localhost:5000/api/users/register",
+          `${import.meta.env.VITE_BACKEND_URL || ""}/api/users/register`,
           {
             method: "POST",
             headers: {
@@ -107,7 +107,7 @@ const AuthPage: React.FC = () => {
       return;
     }
     try {
-      const response = await fetch("http://localhost:5000/api/users/verify", {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || ""}/api/users/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -133,7 +133,7 @@ const AuthPage: React.FC = () => {
     setVerifyMsg("");
     try {
       const response = await fetch(
-        "http://localhost:5000/api/users/resend-verification",
+        `${import.meta.env.VITE_BACKEND_URL || ""}/api/users/resend-verification`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -160,7 +160,7 @@ const AuthPage: React.FC = () => {
     }
     try {
       const response = await fetch(
-        "http://localhost:5000/api/users/request-reset",
+        `${import.meta.env.VITE_BACKEND_URL || ""}/api/users/request-reset`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -38,10 +38,21 @@ const httpServer = createServer(app);
 // Initialize Socket.io service
 const socketService = new SocketService(httpServer);
 
-// ✅ Allow your frontend origin (localhost:3002)
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:3000",
+  "http://localhost:5173",
+].filter(Boolean) as string[];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+  credentials: true,
 }));
 
 app.use(express.json());

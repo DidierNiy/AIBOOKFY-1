@@ -33,7 +33,7 @@ const AuthManager: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const API_BASE = "http://localhost:5000/api/users";
+  const API_BASE = `${import.meta.env.VITE_BACKEND_URL || ""}/api/users`;
 
   const login = async (
     userType: "traveler" | "hotel",
@@ -60,12 +60,12 @@ const AuthManager: React.FC<{ children: ReactNode }> = ({ children }) => {
       localStorage.setItem("user", JSON.stringify(userData));
 
       if (userType === "hotel") {
-        navigate("/pricing"); // hotel manager goes to payment plan
+        navigate("/dashboard");
       } else {
-        navigate("/chat"); // traveler goes to chat
+        navigate("/chat");
       }
     } catch (error) {
-      alert((error as Error).message);
+      throw error;
     } finally {
       setLoading(false);
     }
