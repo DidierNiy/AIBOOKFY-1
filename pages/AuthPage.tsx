@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 const AuthPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
@@ -17,6 +17,12 @@ const AuthPage: React.FC = () => {
   }>({});
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate(user.type === 'hotel' ? '/dashboard' : '/chat', { replace: true });
+    }
+  }, [user, navigate]);
 
   const [isSignUp, setIsSignUp] = useState(true);
   const [role, setRole] = useState<"traveler" | "hotel">("traveler");

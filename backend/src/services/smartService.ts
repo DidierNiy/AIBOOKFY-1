@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ContextService } from './contextService';
 import { findHotels as findHotelsFromGeoapify } from './geoapifyService';
 import { searchHotelImages } from './pexelsService';
+import Listing from '../models/Listing';
 
 // Utility: robustly extract a JSON object string from a model response
 function extractJsonString(input: string): string | null {
@@ -266,7 +267,42 @@ Return ONLY valid JSON:
   }
 }
 
-// 4. Function to search for hotels - REPLACED WITH GEOAPIFY
+// Search locally uploaded listings in MongoDB
+async function searchLocalListings(location: string, query: string): Promise<HotelData[]> {
+  try {
+    const locationRegex = new RegExp(location, 'i');
+    const queryRegex = new RegExp(query.split(' ').filter(w => w.length > 3).join('|'), 'i');
+
+    const listings = await Listing.find({
+      isActive: true,
+      $or: [
+        { location: locationRegex },
+        { name: locationRegex },
+        { description: queryRegex },
+      ],
+    }).limit(12);
+
+    if (listings.length === 0) return [];
+
+    console.log(`✅ Found ${listings.length} local DB listing(s) for "${location}"`);
+
+    return listings.map((l) => ({
+      id: l._id.toString(),
+      name: l.name,
+      location: l.location,
+      description: l.description,
+      price: l.price,
+      amenities: l.amenities,
+      images: l.images.length > 0 ? l.images : [],
+      rating: l.rating,
+    }));
+  } catch (err) {
+    console.error('❌ Error searching local listings:', err);
+    return [];
+  }
+}
+
+// 4. Function to search for hotels - local DB first, Geoapify as fallback
 async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
   const { location } = analysis.entities;
 
@@ -274,8 +310,14 @@ async function searchHotels(analysis: QueryAnalysis): Promise<HotelData[]> {
     console.log('No location provided, skipping API search.');
     return [];
   }
-  
-  console.log(`🚀 Calling Geoapify to find hotels in: "${location}"`);
+
+  // Search local DB listings first
+  const localResults = await searchLocalListings(location, analysis.entities.location || location);
+  if (localResults.length > 0) {
+    return localResults;
+  }
+
+  console.log(`🚀 No local listings found, calling Geoapify for: "${location}"`);
 
   try {
     const hotelsFromApi = await findHotelsFromGeoapify(location);

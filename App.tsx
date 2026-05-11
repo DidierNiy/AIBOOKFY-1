@@ -48,7 +48,7 @@ const ProtectedRoute: React.FC<{ allowedRoles: Array<'traveler' | 'hotel'> }> = 
         return <div className="min-h-screen flex items-center justify-center">Loading...</div>; // Or a spinner component
     }
 
-    return user && allowedRoles.includes(user.type) ? <Outlet /> : <Navigate to="/auth" replace />;
+    return user && allowedRoles.includes(user.type) ? <Outlet /> : <Navigate to="/auth" />;
 };
 
 
