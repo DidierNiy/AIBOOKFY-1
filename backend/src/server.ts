@@ -3,13 +3,14 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { createServer } from "http";
 import path from 'path';
-import connectDB from "./config/database"; 
+import connectDB from "./config/database";
 import userRoutes from "./routes/userRoutes";
 import listingRoutes from "./routes/listingRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import SocketService from "./services/socketService";
+import { seedDatabase } from "./scripts/seedDatabase";
 
 // Load environment variables from src/.env
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -24,10 +25,13 @@ console.log('Environment variables loaded:', {
 // Initialize Express app
 const app = express();
 
-// Connect to MongoDB
+// Connect to MongoDB, then optionally seed
 (async () => {
   try {
     await connectDB();
+    if (process.env.SEED_ON_START === 'true') {
+      await seedDatabase();
+    }
   } catch (error) {
     console.error('Failed to connect to MongoDB:', error);
     process.exit(1);
