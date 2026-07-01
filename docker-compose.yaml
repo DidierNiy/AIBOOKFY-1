@@ -30,6 +30,7 @@ services:
       - LETSENCRYPT_HOST=${BACKEND_DOMAIN}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
       - VIRTUAL_PORT=5003
+      - PORT=5003
       - MONGODB_URI=mongodb://mongodb:27017/aibookify
       - NODE_ENV=production
     env_file:

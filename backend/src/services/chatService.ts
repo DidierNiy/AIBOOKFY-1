@@ -54,7 +54,7 @@ class ChatService {
       });
 
       // Get AI response from smart engine
-      const aiResponse = await getSmartResponse(userMessage);
+      const aiResponse = await getSmartResponse(userMessage, userId);
 
       // Save AI response
       await this.saveMessage({

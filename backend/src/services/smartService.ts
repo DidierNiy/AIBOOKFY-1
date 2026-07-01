@@ -115,7 +115,6 @@ async function analyzeQuery(query: string): Promise<QueryAnalysis> {
     };
   }
   
-  const model = getGeminiModel();
   const prompt = `You are an elite AI travel analyst. Analyze this message and determine the conversation intent.
 
 USER MESSAGE: "${query}"
@@ -392,12 +391,10 @@ async function generateResponse(
     conversationHistory?: string;
     userPreferences?: string;
     lastEmotion?: string;
-    lastIntent?: string; // current detected intent for this turn
+    lastIntent?: string;
     clarifyingQuestions?: string[];
   }
 ): Promise<{ text: string; hotels: HotelData[] }> {
-  const model = getGeminiModel();
-  
   const hotelDetails = hotels.length > 0
     ? hotels.map((h, idx) => 
         `${idx + 1}. **${h.name}**
